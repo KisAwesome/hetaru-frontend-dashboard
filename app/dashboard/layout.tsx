@@ -1,47 +1,49 @@
-import type React from "react"
-import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
-import { FirebaseAuthProvider } from "@/components/firebase-auth-provider"
-import "./globals.css"
+"use client"
 
-const _geist = Geist({ subsets: ["latin"] })
-const _geistMono = Geist_Mono({ subsets: ["latin"] })
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { Sidebar } from "@/components/dashboard/sidebar"
+import { useAuth } from "@/components/firebase-auth-provider"
+import { Loader2 } from "lucide-react"
+import { CSPostHogProvider } from "@/components/providers/posthog-provider" // ✅ Import the provider
 
-export const metadata: Metadata = {
-  title: "Hetaru - AI Microservices Platform",
-  description: "Unified AI microservices with credit-based billing",
-  generator: "v0.app",
-  icons: {
-    icon: [
-      {
-        url: "/icon-light-32x32.png",
-        media: "(prefers-color-scheme: light)",
-      },
-      {
-        url: "/icon-dark-32x32.png",
-        media: "(prefers-color-scheme: dark)",
-      },
-      {
-        url: "/icon.svg",
-        type: "image/svg+xml",
-      },
-    ],
-    apple: "/apple-icon.png",
-  },
-}
-
-export default function RootLayout({
+export default function DashboardLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode
-}>) {
+}) {
+  const { user, loading } = useAuth()
+  const router = useRouter()
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/auth")
+    }
+  }, [user, loading, router])
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    )
+  }
+
+  if (!user) return null
+
   return (
-    <html lang="en">
-      <body className={`font-sans antialiased`}>
-        <FirebaseAuthProvider>{children}</FirebaseAuthProvider>
-        <Analytics />
-      </body>
-    </html>
+    // ✅ Wrap in PostHog Provider
+    // The provider handles identify() internally whenever the user object changes
+    <CSPostHogProvider>
+      <div className="flex h-screen overflow-hidden bg-background">
+        <aside className="hidden w-64 md:flex flex-col z-20 h-full">
+          <Sidebar />
+        </aside>
+
+        <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
+          {children}
+        </main>
+      </div>
+    </CSPostHogProvider>
   )
 }

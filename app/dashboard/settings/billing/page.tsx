@@ -1,15 +1,15 @@
-import { DashboardView } from "@/components/dashboard/dashboard-view"
+import { BillingClient } from "./billing-client"
 import type { Product } from "@/components/PricingSection"
 
-// 1. Fetch Data (Server Side)
 async function getProducts(): Promise<Product[]> {
   try {
-    const res = await fetch(`${process.env.BACKEND_URL || 'http://localhost:8080'}/api/payment/products`, {
+    const baseUrl = process.env.BACKEND_URL || 'http://localhost:8080'
+    const res = await fetch(`${baseUrl}/api/payment/products`, {
       next: { revalidate: 3600 },
     })
+    
     if (!res.ok) return []
     const data = await res.json()
-    // Handle if your API returns { products: [...] } or just [...]
     return data.products || data || []
   } catch (error) {
     console.error("Failed to fetch products:", error)
@@ -17,9 +17,8 @@ async function getProducts(): Promise<Product[]> {
   }
 }
 
-// 2. Render Page
-export default async function DashboardPage() {
+// ✅ This MUST be the default export
+export default async function BillingPage() {
   const products = await getProducts()
-  
-  return <DashboardView products={products} />
+  return <BillingClient products={products} />
 }

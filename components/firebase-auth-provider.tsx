@@ -14,16 +14,43 @@ import {
   getAdditionalUserInfo,
 } from "firebase/auth"
 
-import { doc, onSnapshot } from "firebase/firestore"
+import { doc, onSnapshot,Timestamp } from "firebase/firestore"
 import { auth, googleProvider, db } from "@/lib/firebase"
 import { api } from "@/lib/api"
 
-export type UserProfile = {
-  displayName?: string
-  walletBalance?: number
-  // add more fields you keep in users/{uid} if needed
+export type UserUsageStats = {
+  currentMonth: string         // e.g. "2025-12"
+  monthSpent: number           // Credits spent this month
+  monthRequestCount: number    // Total requests this month
+  totalSpent: number           // Lifetime spent
+  totalServices: number        // Lifetime requests
+  uniqueServicesCount: number  // Count of unique tools used
+  uniqueServiceIds: string[]   // ["image-gen", "code-writer"]
 }
 
+// 2. Update the Main Profile Type
+export type UserProfile = {
+  uid: string
+  email: string
+  displayName?: string
+  photoURL?: string
+  walletBalance: number
+
+  // ✅ Usage Data (Optional because old users might not have it yet)
+  usage?: UserUsageStats
+
+  // ✅ Stripe & Subscription Data
+  stripeCustomerId?: string | null
+  stripeSubscriptionId?: string | null
+  stripePriceId?: string | null
+  subscriptionStatus?: "active" | "inactive" | "past_due" | "canceled" | "incomplete"
+  subscriptionTier?: "free" | "starter" | "pro"
+  nextBillingDate?: Timestamp | null
+
+  // ✅ Activity Metadata
+  createdAt?: Timestamp
+  lastActive?: Timestamp
+}
 type AuthCtx = {
   user: User | null
   loading: boolean
@@ -133,7 +160,7 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
     }
   }
 
-  const signUp = async (email: string, password: string, displayName?: string) => {
+  const signUp = async (email: string, password: string, displayName: string) => {
     try {
       setError(null)
       const trimmedName = displayName?.trim()
@@ -143,12 +170,18 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
         await updateProfile(cred.user, { displayName: trimmedName })
       }
 
-      await sendEmailVerification(cred.user)
+      // ✅ NEW: Tell Firebase where to go after clicking
+      const actionCodeSettings = {
+        // REPLACE WITH YOUR PRODUCTION URL WHEN DEPLOYING
+        url: `${window.location.origin}/auth/verify`, 
+        handleCodeInApp: true,
+      };
+
+      await sendEmailVerification(cred.user, actionCodeSettings) // <--- Pass settings here!
+      
       setEmailVerificationSent(true)
       setVerificationEmail(email)
 
-      // Your existing flow: create user doc/wallet etc
-      // ✅ pass displayName so backend stores it in users/{uid}
       await api.post("/api/register", { displayName: trimmedName || null })
     } catch (err: any) {
       setError(friendlyFirebaseError(err))
@@ -187,12 +220,18 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       throw err
     }
   }
-
-  const resendVerificationEmail = async () => {
+const resendVerificationEmail = async () => {
     try {
       setError(null)
       if (!auth.currentUser) throw new Error("No user to verify")
-      await sendEmailVerification(auth.currentUser)
+      
+      // ✅ Same settings here
+      const actionCodeSettings = {
+        url: `${window.location.origin}/auth/verify`,
+        handleCodeInApp: true,
+      };
+
+      await sendEmailVerification(auth.currentUser, actionCodeSettings)
       setEmailVerificationSent(true)
       setVerificationEmail(auth.currentUser.email || verificationEmail)
     } catch (err: any) {
@@ -200,7 +239,6 @@ export function FirebaseAuthProvider({ children }: { children: React.ReactNode }
       throw err
     }
   }
-
   const dismissEmailVerification = () => setEmailVerificationSent(false)
 
   const value = useMemo<AuthCtx>(
