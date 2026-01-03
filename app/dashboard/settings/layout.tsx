@@ -1,4 +1,5 @@
-import { Separator } from "@/components/ui/separator"
+
+import { Metadata } from "next";
 import { SidebarNav } from "./sidebar-nav"
 
 const sidebarNavItems = [
@@ -20,29 +21,35 @@ interface SettingsLayoutProps {
   children: React.ReactNode
 }
 
+export const metadata: Metadata = {
+  title: 'Settings - Hetaru',
+  description: 'Settings and preferences for your Hetaru account.',
+};
+
 export default function SettingsLayout({ children }: SettingsLayoutProps) {
   return (
-    <div className="space-y-6 p-10 pb-16 md:block">
-      <div className="space-y-0.5">
-        <h2 className="text-2xl font-bold tracking-tight">Settings</h2>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences.
-        </p>
-      </div>
-      <Separator className="my-6" />
-      
-      {/* ✅ Layout Fix: flex-row with fixed width sidebar */}
-      <div className="flex flex-col space-y-8 lg:flex-row lg:space-x-12 lg:space-y-0">
-        
-        {/* Changed lg:w-1/5 to lg:w-64 and added shrink-0 */}
-        <aside className="lg:w-64 shrink-0">
-          <SidebarNav items={sidebarNavItems} />
-        </aside>
-
-        {/* Main Content Area */}
-        <div className="flex-1 lg:max-w-2xl">
-            {children}
+    <div className="w-full py-4 px-6 md:px-8">
+      <div className="space-y-8 pb-12">
+        <div className="-mx-6 md:-mx-8 px-6 md:px-8 border-b border-border pb-2">
+          <div className="max-w-6xl">
+            <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+            <p className="text-muted-foreground mt-2">
+              Manage your account settings and preferences.
+            </p>
+          </div>
         </div>
+      
+        <div className="max-w-6xl">
+          <div className="flex flex-col lg:flex-row lg:space-x-12 lg:space-y-0 space-y-8">
+            <aside className="lg:w-64 shrink-0">
+              <SidebarNav items={sidebarNavItems} />
+            </aside>
+            <div className="flex-1">
+               {children}
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
   )

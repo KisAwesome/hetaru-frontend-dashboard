@@ -19,7 +19,7 @@ export function DashboardView({ products }: { products: Product[] }) {
     else if (hour >= 12 && hour < 17) message = `Good afternoon, ${name}`
     else if (hour >= 17 && hour < 19) message = `It's golden hour time, ${name}`
     else if (hour >= 19 && hour < 23) message = `Good evening, ${name}`
-    else message = `Late night ${name}`
+    else message = `Late night, ${name}`
     
     setGreeting(message)
   }, [profile?.displayName])

@@ -1,6 +1,11 @@
+import { Metadata } from "next"
 import { BillingClient } from "./billing-client"
 import type { Product } from "@/components/PricingSection"
 
+
+export const metadata: Metadata = {
+  title: 'Billing & Plans - Hetaru',
+}
 async function getProducts(): Promise<Product[]> {
   try {
     const baseUrl = process.env.BACKEND_URL || 'http://localhost:8080'

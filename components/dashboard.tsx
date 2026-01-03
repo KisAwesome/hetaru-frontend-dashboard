@@ -1,14 +1,14 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { TrendingUp, AlertCircle, Zap, Activity } from "lucide-react"
 
 import { useAuth } from "@/components/firebase-auth-provider"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
-
-import { PricingSection, type Product } from "@/components/PricingSection"
+import dynamic from "next/dynamic" 
+import { type Product } from "@/components/PricingSection"
 import {
   Dialog,
   DialogContent,
@@ -18,12 +18,29 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 
-import { CheckoutForm } from "@/components/CheckoutForm"
-import { TransactionHistory } from "@/components/TransactionHistory"
+// ✅ NEW IMPORTS: For verification logic
+import { useToast } from "@/hooks/use-toast"
+import { EmailVerificationAlert } from "@/components/email-verification-alert"
+
 import { CreditsChart } from "./credits-chart"
+import { PricingSkeleton } from "./dashboard/skeletons/PricingSection"
+
+
+const PricingSection = dynamic(() => import("@/components/PricingSection").then(mod => mod.PricingSection), {
+  loading: () => <PricingSkeleton></PricingSkeleton>
+})
+
+const CheckoutForm = dynamic(() => import("@/components/CheckoutForm").then(mod => mod.CheckoutForm), {
+  loading: () => <div className="p-4 animate-pulse">Loading secure checkout...</div>
+})
+
+const TransactionHistory = dynamic(() => import("@/components/TransactionHistory").then(mod => mod.TransactionHistory), {
+  loading: () => <div className="h-40 w-full animate-pulse bg-muted/20" />
+})
 
 export function Dashboard({ products }: { products: Product[] }) {
   const { user, profile, profileLoading } = useAuth()
+  const { toast } = useToast() // ✅ Hook for notifications
 
   const [showCheckout, setShowCheckout] = useState(false)
   const [selectedPriceId, setSelectedPriceId] = useState<string>("")
@@ -37,15 +54,34 @@ export function Dashboard({ products }: { products: Product[] }) {
   const totalServices = 100 
   
   const serviceProgress = Math.min((uniqueCount / totalServices) * 100, 100)
-
   const handleSelectProduct = (priceId: string) => {
+    // ✅ GATE: Check if email is verified
+    if (user && !user.emailVerified) {
+    toast({
+      className: "bg-card border-l-4 border-l-primary border-y-border border-r-border shadow-2xl py-4",        
+        title: "Verification Required",
+        description: "Please verify your email address to purchase credits.",
+      })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      setShowPricing(false) // Close the pricing dialog
+      return
+    }
+
+    // Normal Flow
     setSelectedPriceId(priceId)
-    setShowCheckout(true) // Triggers the new Dialog below
-    setShowPricing(false) // Closes the pricing list
+    setShowCheckout(true) 
+    setShowPricing(false) 
   }
 
   return (
     <div className="space-y-6">
+      
+      {/* ✅ NEW: Verification Alert at the top */}
+      {/* This only shows if user is logged in but NOT verified */}
+      {user && !user.emailVerified && (
+        <EmailVerificationAlert user={user} />
+      )}
+
       {/* 3 Metric Cards */}
       <div className="grid md:grid-cols-3 gap-4">
         
@@ -178,7 +214,7 @@ export function Dashboard({ products }: { products: Product[] }) {
         </CardContent>
       </Card>
 
-      {/* ✅ NEW: Separate Dialog for Checkout Form (The "Big One in the Middle") */}
+      {/* Checkout Dialog */}
       <Dialog open={showCheckout} onOpenChange={setShowCheckout}>
         <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>

@@ -1,101 +1,94 @@
 import { auth } from "./firebase";
-import posthog from "posthog-js"; // ✅ Import posthog
+import posthog from "posthog-js";
 
-const BACKEND_URL = "http://localhost:8080"; 
+const BACKEND_URL = "http://localhost:8080";
+
+type PostOptions = {
+  headers?: Record<string, string>;
+  formData?: boolean; // if true, body is FormData
+};
 
 export const api = {
-  
-  // 1. GET Request
   get: async (endpoint: string) => {
     const user = auth.currentUser;
     if (!user) throw new Error("User not logged in");
-    
+
     const token = await user.getIdToken();
 
-    try {
-      const res = await fetch(`${BACKEND_URL}${endpoint}`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+    const res = await fetch(`${BACKEND_URL}${endpoint}`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+    });
 
-      if (!res.ok) {
+    if (!res.ok) {
+      let errorMessage = "API Request Failed";
+      try {
         const errorData = await res.json();
-        
-        // ✅ Capture API-level errors (400s, 500s)
-        posthog.captureException(new Error(`API GET Failed: ${res.status}`), {
-          properties: {
-            endpoint,
-            status: res.status,
-            error_detail: errorData.message || errorData.error,
-            userId: user.uid
-          }
-        });
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch {}
 
-        throw new Error(errorData.message || "API Request Failed");
+      if (res.status !== 402) {
+        posthog.captureException(new Error(`API GET Failed: ${res.status} - ${endpoint}`), {
+          status: res.status,
+          error_detail: errorMessage,
+          userId: user.uid,
+        });
       }
 
-      return res.json();
-    } catch (err: any) {
-      // ✅ Capture Network/CORS errors
-      posthog.captureException(err, {
-        properties: { 
-          endpoint, 
-          type: 'network_or_cors_error',
-          userId: user.uid 
-        }
-      });
-      throw err;
+      throw new Error(errorMessage);
     }
+
+    return res.json();
   },
 
-  // 2. POST Request
-  post: async (endpoint: string, body: any) => {
+  post: async (endpoint: string, body: any, options: PostOptions = {}) => {
     const user = auth.currentUser;
     if (!user) throw new Error("User not logged in");
-    
+
     const token = await user.getIdToken();
 
-    try {
-      const res = await fetch(`${BACKEND_URL}${endpoint}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
-      });
+    const isForm = options.formData === true;
+    const extraHeaders = options.headers || {};
 
-      if (!res.ok) {
+    // IMPORTANT:
+    // - If sending FormData, DO NOT set Content-Type manually.
+    //   Browser will set it with the correct boundary.
+    const headers: Record<string, string> = {
+      Authorization: `Bearer ${token}`,
+      ...extraHeaders,
+      ...(isForm ? {} : { "Content-Type": "application/json" }),
+    };
+
+    const res = await fetch(`${BACKEND_URL}${endpoint}`, {
+      method: "POST",
+      headers,
+      body: isForm ? (body as FormData) : JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      let errorMessage = "API Request Failed";
+      try {
         const errorData = await res.json();
-        
-        // ✅ Log detailed billing/AI errors to PostHog
-        posthog.captureException(new Error(`API POST Failed: ${res.status}`), {
-          properties: {
-            endpoint,
-            status: res.status,
-            error_detail: errorData.message || errorData.error,
-            request_body: body, // Careful not to log sensitive data here
-            userId: user.uid
-          }
-        });
+        errorMessage = errorData.message || errorData.error || errorMessage;
+      } catch {}
 
-        throw new Error(errorData.message || "API Request Failed");
+      // ignore expected user errors
+      if (res.status === 402 || res.status === 413) {
+        throw new Error(errorMessage);
       }
 
-      return res.json();
-    } catch (err: any) {
-      // ✅ Capture unexpected crashes or network failures
-      posthog.captureException(err, {
-        properties: { 
-          endpoint, 
-          type: 'post_request_crash',
-          userId: user.uid 
-        }
+      posthog.captureException(new Error(`API POST Failed: ${res.status} - ${endpoint}`), {
+        status: res.status,
+        error_detail: errorMessage,
+        userId: user.uid,
       });
-      throw err;
+
+      throw new Error(errorMessage);
     }
-  }
+
+    return res.json();
+  },
 };

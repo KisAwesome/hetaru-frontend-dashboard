@@ -1,10 +1,10 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { onAuthStateChanged } from "firebase/auth"
 import { Loader2, CheckCircle2, XCircle, ArrowRight } from "lucide-react"
-import { sendGAEvent } from "@next/third-parties/google" // ✅ 1. Import GA Event function
+import { sendGAEvent } from "@next/third-parties/google"
 
 import { auth } from "@/lib/firebase"
 import { api } from "@/lib/api"
@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button"
 
 type PageState = "loading" | "success" | "incomplete" | "error" | "unauth" | "missing"
 
-export default function ReturnPage() {
+// 1. Logic Component
+function ReturnContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get("session_id")
@@ -62,7 +63,6 @@ export default function ReturnPage() {
 
       try {
         const data = await api.get(`/api/payment/session-status?session_id=${encodeURIComponent(sessionId)}`)
-
         const s = String(data?.status || "").toLowerCase()
         const email = data?.customer_email || ""
 
@@ -70,21 +70,12 @@ export default function ReturnPage() {
 
         if (s === "complete" || s === "paid") {
           setState("success")
-
-          // ✅ 2. Fire Google Analytics Purchase Event
-          // Note: We use the available data or fallbacks
           sendGAEvent("event", "purchase", {
-            transaction_id: sessionId, // Use session ID as unique transaction key
-            value: data?.amount_total ? data.amount_total / 100 : 0, // Stripe returns cents, convert to dollars
+            transaction_id: sessionId,
+            value: data?.amount_total ? data.amount_total / 100 : 0,
             currency: data?.currency || "USD",
-            items: [
-              {
-                item_id: "hetaru_credit_pack", // Generic ID or get from data
-                item_name: "Credit Top-up",
-              }
-            ]
+            items: [{ item_id: "hetaru_credit_pack", item_name: "Credit Top-up" }]
           })
-          
         } else if (s === "open") {
           setState("incomplete")
         } else {
@@ -99,7 +90,6 @@ export default function ReturnPage() {
     return () => unsubscribe()
   }, [sessionId])
 
-  // Redirect countdown when success
   useEffect(() => {
     if (state !== "success") return
     setCountdown(3)
@@ -115,7 +105,6 @@ export default function ReturnPage() {
     }
   }, [state, countdown, router])
 
-
   const icon = useMemo(() => {
     if (state === "loading") return <Loader2 className="h-10 w-10 animate-spin text-primary" />
     if (state === "success") return <CheckCircle2 className="h-10 w-10 text-primary" />
@@ -130,47 +119,57 @@ export default function ReturnPage() {
         </Button>
       )
     }
-    // ... keep other states same as before
-    if (state === "unauth") {
-      return <Button className="w-full" onClick={() => router.push("/")}>Go to login <ArrowRight className="ml-2 h-4 w-4" /></Button>
-    }
-    if (state === "incomplete") {
-      return <Button className="w-full" onClick={() => router.push("/")}>Back to dashboard <ArrowRight className="ml-2 h-4 w-4" /></Button>
-    }
-    if (state === "error") {
-      return <Button className="w-full" onClick={() => window.location.reload()}>Try again</Button>
-    }
-    if (state === "missing") {
-      return <Button className="w-full" onClick={() => router.push("/")}>Back to dashboard <ArrowRight className="ml-2 h-4 w-4" /></Button>
-    }
+    if (state === "unauth") return <Button className="w-full" onClick={() => router.push("/")}>Go to login <ArrowRight className="ml-2 h-4 w-4" /></Button>
+    if (state === "incomplete") return <Button className="w-full" onClick={() => router.push("/")}>Back to dashboard <ArrowRight className="ml-2 h-4 w-4" /></Button>
+    if (state === "error") return <Button className="w-full" onClick={() => window.location.reload()}>Try again</Button>
+    if (state === "missing") return <Button className="w-full" onClick={() => router.push("/")}>Back to dashboard <ArrowRight className="ml-2 h-4 w-4" /></Button>
     return <Button className="w-full" disabled>Verifying…</Button>
   }, [state, router])
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-card/60 backdrop-blur border-border">
-        <CardHeader className="text-center space-y-2">
-          <div className="mx-auto w-14 h-14 rounded-2xl border border-border bg-background/40 flex items-center justify-center">
-            {icon}
-          </div>
-          <CardTitle className="text-2xl">{title}</CardTitle>
-          <CardDescription className="text-base">{description}</CardDescription>
-        </CardHeader>
+    <Card className="w-full max-w-md bg-card/60 backdrop-blur border-border">
+      <CardHeader className="text-center space-y-2">
+        <div className="mx-auto w-14 h-14 rounded-2xl border border-border bg-background/40 flex items-center justify-center">
+          {icon}
+        </div>
+        <CardTitle className="text-2xl">{title}</CardTitle>
+        <CardDescription className="text-base">{description}</CardDescription>
+      </CardHeader>
 
-        <CardContent className="space-y-3">
-          {primaryAction}
-          {state === "incomplete" && (
-            <p className="text-sm text-muted-foreground text-center">
-              If you were charged but don’t see credits, contact support with your session id.
-            </p>
-          )}
-          {sessionId && (
-            <p className="text-xs text-muted-foreground text-center break-all">
-              Session: {sessionId}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <CardContent className="space-y-3">
+        {primaryAction}
+        {state === "incomplete" && (
+          <p className="text-sm text-muted-foreground text-center">
+            If you were charged but don’t see credits, contact support with your session id.
+          </p>
+        )}
+        {sessionId && (
+          <p className="text-xs text-muted-foreground text-center break-all">
+            Session: {sessionId}
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
+// 2. Main Export with Suspense
+export default function ReturnPage() {
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center p-4">
+      <Suspense fallback={
+        <Card className="w-full max-w-md bg-card/60 backdrop-blur border-border">
+          <CardHeader className="text-center space-y-2">
+            <div className="mx-auto w-14 h-14 rounded-2xl border border-border bg-background/40 flex items-center justify-center">
+              <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            </div>
+            <CardTitle className="text-2xl">Verifying payment</CardTitle>
+            <CardDescription className="text-base">Please wait while we confirm your transaction...</CardDescription>
+          </CardHeader>
+        </Card>
+      }>
+        <ReturnContent />
+      </Suspense>
     </div>
   )
 }

@@ -1,76 +1,60 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Zap, Lock, TrendingUp, ArrowRight, X, Heart, Sparkles, History } from 'lucide-react'
+import { Zap, Lock, TrendingUp, ArrowRight, Heart, Sparkles, History } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { AIServiceTester } from './ai-service-tester'
 import { useAuth } from '@/components/firebase-auth-provider'
+import { useToast } from "@/hooks/use-toast"
+import { EmailVerificationAlert } from "@/components/email-verification-alert"
+import { ServiceBackend } from '@/app/dashboard/services/page' // Adjusted import path based on standard structure
+import { useRouter } from 'next/navigation'
 
-interface Service {
-  id: string
-  name: string
-  description: string
-  creditCost: number
-  category: string
-  popularity: number
-  icon: string
+interface ServiceCatalogProps {
+  initialServices: ServiceBackend[]
+  serviceOfDayId: string | null
 }
 
-const SERVICES: Service[] = [
-  { id: 'img-gen', name: 'Image Generation', description: 'Create AI-powered images from text descriptions', creditCost: 150, category: 'AI', popularity: 95, icon: '🎨' },
-  { id: 'text-analysis', name: 'Text Analysis', description: 'Analyze sentiment, extract entities, and more', creditCost: 25, category: 'NLP', popularity: 87, icon: '📝' },
-  { id: 'recipe-gpt', name: 'Recipe GPT', description: 'Generate personalized recipes based on ingredients', creditCost: 50, category: 'Lifestyle', popularity: 72, icon: '👨‍🍳' },
-  { id: 'calorie-counter', name: 'Calorie Counter', description: 'Analyze food and calculate nutritional information', creditCost: 40, category: 'Health', popularity: 81, icon: '🍎' },
-  { id: 'meal-planner', name: 'Meal Planner', description: 'AI-powered meal planning and grocery lists', creditCost: 75, category: 'Lifestyle', popularity: 68, icon: '📅' },
-  { id: 'code-gen', name: 'Code Generator', description: 'Generate code snippets and solutions', creditCost: 100, category: 'Development', popularity: 92, icon: '💻' },
-  { id: 'summarizer', name: 'Text Summarizer', description: 'Summarize long documents into key points', creditCost: 30, category: 'NLP', popularity: 88, icon: '📋' },
-  { id: 'translation', name: 'Multi-Language Translator', description: 'Translate text between 100+ languages', creditCost: 20, category: 'NLP', popularity: 85, icon: '🌐' },
-  { id: 'music-gen', name: 'Music Generator', description: 'Generate royalty-free music compositions', creditCost: 200, category: 'Creative', popularity: 76, icon: '🎵' },
-  { id: 'video-edit', name: 'Video Editor AI', description: 'Auto-edit and generate video content', creditCost: 250, category: 'Creative', popularity: 71, icon: '🎬' },
-  { id: 'voice-clone', name: 'Voice Cloning', description: 'Clone and synthesize realistic voices', creditCost: 120, category: 'Audio', popularity: 83, icon: '🎤' },
-  { id: 'fitness-coach', name: 'AI Fitness Coach', description: 'Get personalized workout and nutrition plans', creditCost: 60, category: 'Health', popularity: 78, icon: '💪' },
-  { id: 'content-writer', name: 'Content Writer', description: 'Generate blog posts, articles, and copy', creditCost: 45, category: 'Writing', popularity: 89, icon: '✍️' },
-  { id: 'seo-optimizer', name: 'SEO Optimizer', description: 'Optimize content for search engines', creditCost: 35, category: 'Marketing', popularity: 82, icon: '🔍' },
-  { id: 'chatbot-builder', name: 'Chatbot Builder', description: 'Create intelligent chatbots for customer support', creditCost: 80, category: 'Development', popularity: 79, icon: '🤖' },
-]
-
-const getServiceOfDay = (): Service => {
-  const today = new Date().toDateString()
-  const seed = today.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
-  return SERVICES[seed % SERVICES.length]
-}
-
-export function ServiceCatalog() {
+export function ServiceCatalog({ initialServices, serviceOfDayId }: ServiceCatalogProps) {
   const { user, profile } = useAuth()
+  const { toast } = useToast()
+  const router = useRouter()
+  
   const [greeting, setGreeting] = useState("")
-
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategory, setSelectedCategory] = useState('All')
-  const [selectedService, setSelectedService] = useState<Service | null>(null)
   
+  // Map backend data to UI shape
+  const [services] = useState(() => initialServices.map(s => ({
+    ...s,
+    creditCost: s.cost,
+    category: s.category || "General",
+    icon: s.icon || "⚡",
+    popularity: s.popularity || 80
+  })))
+
+  // Removed 'selectedService' state because we are navigating to a new page now
   const [favorites, setFavorites] = useState<string[]>([])
   const [recentServices, setRecentServices] = useState<string[]>([])
-  const [serviceOfDay] = useState<Service>(getServiceOfDay())
 
-  // 1. Dynamic Greeting Logic
+  const serviceOfDay = services.find(s => s.id === serviceOfDayId) || services[0];
+
+  // Dynamic Greeting
   useEffect(() => {
     const name = profile?.displayName?.split(" ")[0] || "friend"
     const hour = new Date().getHours()
-
     let message = ""
     if (hour >= 5 && hour < 9) message = `Early morning grinding, ${name}`
     else if (hour >= 9 && hour < 12) message = `Good morning, ${name}. Ready to build?`
     else if (hour >= 12 && hour < 17) message = `Good afternoon, ${name}`
     else if (hour >= 17 && hour < 19) message = `It's golden hour time, ${name}`
     else if (hour >= 19 && hour < 23) message = `Good evening, ${name}`
-    else message = `Late night ${name}`
-    
+    else message = `Late night, ${name}`
     setGreeting(message)
   }, [profile?.displayName])
 
-  // 2. Load User Preferences
+  // Load Preferences
   useEffect(() => {
     if (!user?.uid) return
     const savedFavorites = localStorage.getItem(`favorites_${user.uid}`)
@@ -85,7 +69,6 @@ export function ServiceCatalog() {
     const updated = favorites.includes(serviceId)
       ? favorites.filter(id => id !== serviceId)
       : [...favorites, serviceId]
-    
     setFavorites(updated)
     localStorage.setItem(`favorites_${user.uid}`, JSON.stringify(updated))
   }
@@ -94,53 +77,59 @@ export function ServiceCatalog() {
     if (!user?.uid) return
     const filtered = recentServices.filter(id => id !== serviceId)
     const updated = [serviceId, ...filtered].slice(0, 5)
-    
     setRecentServices(updated)
     localStorage.setItem(`recent_${user.uid}`, JSON.stringify(updated))
+  } 
+
+  // ✅ NAVIGATION HANDLER
+  const handleLaunchService = (service: any) => {
+    if (user && !user.emailVerified) {
+      toast({
+        className: "bg-background border-l-4 border-l-amber-500 border-y-border border-r-border text-amber-700 dark:text-amber-500",
+        title: "Verification Required",
+        description: "Please verify your email address to use AI services.",
+      })
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+      return
+    }
+    
+    // 1. Save to history
+    addToRecent(service.id)
+    
+    // 2. Navigate to the specific service page
+    // This matches the folder structure: /app/(dashboard)/services/calorie-ai/page.tsx
+    router.push(`/dashboard/services/${service.id}`)
   }
 
-  const categories = ['All', ...Array.from(new Set(SERVICES.map(s => s.category)))]
+  const categories = ['All', ...Array.from(new Set(services.map(s => s.category)))]
 
-  const filteredServices = SERVICES.filter(service => {
+  const filteredServices = services.filter(service => {
     const matchesSearch = service.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           service.description.toLowerCase().includes(searchQuery.toLowerCase())
     const matchesCategory = selectedCategory === 'All' || service.category === selectedCategory
     return matchesSearch && matchesCategory
   })
 
-  const favoriteServices = SERVICES.filter(s => favorites.includes(s.id))
-  const recentServicesData = SERVICES.filter(s => recentServices.includes(s.id))
+  const favoriteServices = services.filter(s => favorites.includes(s.id))
+  const recentServicesData = services.filter(s => recentServices.includes(s.id))
 
-  // 3. Tester View (If service selected)
-  if (selectedService && user) {
+  // --- RENDER ---
+  // Note: I removed the "if (selectedService)" block because we are using Routing now.
+
+  if (services.length === 0) {
     return (
-      <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
-        <Button
-          variant="ghost"
-          onClick={() => setSelectedService(null)}
-          className="mb-4 hover:bg-secondary/80"
-        >
-          <X className="w-4 h-4 mr-2" />
-          Back to Service Catalog
-        </Button>
-        <AIServiceTesterWithTracking
-          userId={user.uid}
-          serviceName={selectedService.name}
-          creditCost={selectedService.creditCost}
-          serviceId={selectedService.id}
-          onUseService={() => addToRecent(selectedService.id)}
-        />
-      </div>
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+            <div className="w-16 h-16 bg-secondary/50 rounded-full flex items-center justify-center mb-4">
+               <Lock className="w-8 h-8 text-muted-foreground opacity-50" />
+            </div>
+            <h3 className="text-lg font-medium">Connecting to Registry...</h3>
+            <p className="text-muted-foreground">Fetching live AI services.</p>
+        </div>
     )
   }
 
   return (
     <div className="space-y-8 pb-12">
-      {/* ✅ HEADER FIXED: 
-         - Negative margins (-mx) pull the border to the sidebar edges.
-         - Padding (px) pushes the text back into alignment.
-         - max-w-6xl keeps the text aligned with the content below.
-      */}
       <div className="-mx-6 md:-mx-8 px-6 md:px-8 border-b border-border pb-2">
         <div className="max-w-6xl">
           <h1 className="text-3xl font-bold tracking-tight">{greeting}</h1>
@@ -150,12 +139,14 @@ export function ServiceCatalog() {
         </div>
       </div>
 
-      {/* ✅ CONTENT WRAPPER:
-         - Constrains the cards to max-w-6xl so they don't look huge on big screens.
-      */}
       <div className="max-w-6xl space-y-8">
         
-        {/* Service of the Day */}
+        {user && !user.emailVerified && (
+          <EmailVerificationAlert user={user} />
+        )}
+
+        {/* Service of the Day Card */}
+        {serviceOfDay && (
         <Card className="border-primary/50 bg-gradient-to-br from-primary/5 via-background to-accent/5 overflow-hidden relative">
           <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none text-9xl">
               {serviceOfDay.icon}
@@ -183,10 +174,7 @@ export function ServiceCatalog() {
                   </span>
                 </div>
                 <Button
-                  onClick={() => {
-                    setSelectedService(serviceOfDay)
-                    addToRecent(serviceOfDay.id)
-                  }}
+                  onClick={() => handleLaunchService(serviceOfDay)}
                   className="w-full shadow-lg shadow-primary/20"
                 >
                   Try Now (-20%)
@@ -195,6 +183,7 @@ export function ServiceCatalog() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Recents */}
         {recentServicesData.length > 0 && (
@@ -208,7 +197,7 @@ export function ServiceCatalog() {
                 <Card
                   key={service.id}
                   className="cursor-pointer hover:border-primary/50 hover:bg-secondary/10 transition group"
-                  onClick={() => setSelectedService(service)}
+                  onClick={() => handleLaunchService(service)}
                 >
                   <CardContent className="p-4 flex flex-col items-center text-center gap-2">
                     <div className="text-2xl group-hover:scale-110 transition duration-300">{service.icon}</div>
@@ -234,7 +223,7 @@ export function ServiceCatalog() {
                   service={service}
                   isFavorite={true}
                   onToggleFavorite={() => toggleFavorite(service.id)}
-                  onClick={() => setSelectedService(service)}
+                  onClick={() => handleLaunchService(service)}
                 />
               ))}
             </div>
@@ -276,7 +265,7 @@ export function ServiceCatalog() {
               service={service}
               isFavorite={favorites.includes(service.id)}
               onToggleFavorite={() => toggleFavorite(service.id)}
-              onClick={() => setSelectedService(service)}
+              onClick={() => handleLaunchService(service)}
             />
           ))}
         </div>
@@ -295,10 +284,8 @@ export function ServiceCatalog() {
   )
 }
 
-// --- Sub-components ---
-
 interface ServiceCardProps {
-  service: Service
+  service: any
   isFavorite: boolean
   onToggleFavorite: () => void
   onClick: () => void
@@ -352,31 +339,5 @@ function ServiceCard({ service, isFavorite, onToggleFavorite, onClick }: Service
         </Button>
       </CardContent>
     </Card>
-  )
-}
-
-interface AIServiceTesterWithTrackingProps {
-  userId: string
-  serviceName: string
-  creditCost: number
-  serviceId: string
-  onUseService: () => void
-}
-
-function AIServiceTesterWithTracking({
-  userId,
-  serviceName,
-  creditCost,
-  serviceId,
-  onUseService,
-}: AIServiceTesterWithTrackingProps) {
-  return (
-    <AIServiceTester
-      userId={userId}
-      serviceName={serviceName}
-      creditCost={creditCost}
-      serviceId={serviceId}
-      onServiceUsed={onUseService}
-    />
   )
 }

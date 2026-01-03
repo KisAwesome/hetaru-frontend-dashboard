@@ -5,7 +5,7 @@ import { FileQuestion, MoveLeft } from "lucide-react"
 export default function NotFound() {
   return (
     <div className="h-screen w-full flex flex-col items-center justify-center bg-background text-foreground p-4">
-      <div className="flex flex-col items-center text-center space-y-6 max-w-md animate-in fade-in zoom-in duration-500">
+      <div className="flex flex-col items-center text-center space-y-6 max-w-md animate-in fade-in zoom-in duration-100">
         
         {/* Icon with glowing effect */}
         <div className="relative">

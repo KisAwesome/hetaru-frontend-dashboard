@@ -1,7 +1,6 @@
 import type React from "react"
 import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
-import { Analytics } from "@vercel/analytics/next"
 import { GoogleAnalytics } from "@next/third-parties/google" 
 import { FirebaseAuthProvider } from "@/components/firebase-auth-provider"
 import { Toaster } from "@/components/ui/toaster"
@@ -53,8 +52,6 @@ export default function RootLayout({
              <Toaster />
           </FirebaseAuthProvider>
         </ThemeProvider>
-        
-        <Analytics />
         <GoogleAnalytics gaId={"G-8RNGC21CS8"} />
       </body>
     </html>

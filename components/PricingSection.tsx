@@ -29,7 +29,7 @@ export function PricingSection({
   )[0]?.id
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in duration-500">
       {products.map((p) => {
         const creditsNum = Number(p.metadata?.credits ?? 0)
         const creditsLabel = creditsNum ? creditsNum.toLocaleString() : "—"
